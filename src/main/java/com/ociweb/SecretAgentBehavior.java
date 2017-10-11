@@ -2,6 +2,7 @@ package com.ociweb;
 
 import com.ociweb.gl.api.ShutdownListener;
 import com.ociweb.gl.api.StartupListener;
+import com.ociweb.gl.api.TimeListener;
 import com.ociweb.iot.maker.DigitalListener;
 import com.ociweb.iot.maker.FogCommandChannel;
 import com.ociweb.iot.maker.FogRuntime;
@@ -9,8 +10,7 @@ import com.ociweb.iot.maker.Port;
 import com.ociweb.iot.grove.lcd_rgb.Grove_LCD_RGB;
 import static com.ociweb.iot.maker.FogCommandChannel.I2C_WRITER;
 
-public class SecretAgentBehavior implements DigitalListener, ShutdownListener, StartupListener 
-{
+public class SecretAgentBehavior implements DigitalListener, ShutdownListener, StartupListener, TimeListener {
 
 	private final FogCommandChannel buzzerChannel;
 	private final FogCommandChannel RedLEDChannel;
@@ -22,8 +22,7 @@ public class SecretAgentBehavior implements DigitalListener, ShutdownListener, S
 	private final Port RedLEDPort;
 	private final Port motionPort;
 
-	private long startTime;
-	private long stopTime;
+	private int timer = 10;
 	private boolean gameOn = false;
 
 	private final int off = 0;
@@ -43,7 +42,7 @@ public class SecretAgentBehavior implements DigitalListener, ShutdownListener, S
 
 	@Override
 	public void digitalEvent(Port port, long time, long duration, int value) {
-		if (port == motionPort) {
+		if (gameOn && port == motionPort) {
 			Grove_LCD_RGB.commandForTextAndColor(LCDChannel, "Detected motion!\nGame over", 255, 0, 0);
 			gameOn = false;
 			RedLEDChannel.setValue(RedLEDPort, value == 1);
@@ -52,21 +51,11 @@ public class SecretAgentBehavior implements DigitalListener, ShutdownListener, S
 		}
 		if (port == buttonPort && value == 1) {
 			if (gameOn) {
-				stopTime = System.currentTimeMillis();
-				if (stopTime - startTime > 10000) {
-					RedLEDChannel.setValue(RedLEDPort, value == 1);
-					buzzerChannel.setValueAndBlock(buzzerPort, value == 1, 1000);
-					GreenLEDChannel.setValue(GreenLEDPort, value != 1);
-					Grove_LCD_RGB.commandForTextAndColor(LCDChannel, "Too slow!\nYou lose", 255, 0, 0);
-					gameOn = false;
-				} else {
-					Grove_LCD_RGB.commandForTextAndColor(LCDChannel, "You win!\nNice", 0, 255, 0);
-					gameOn = false;
-				}
+				Grove_LCD_RGB.commandForTextAndColor(LCDChannel, "You win!\nNice job", 0, 255, 0);
+				gameOn = false;
 			} else {
 				gameOn = true;
-				Grove_LCD_RGB.commandForTextAndColor(LCDChannel, "Game started!\nPush the button", 0, 191, 255);
-				startTime = System.currentTimeMillis();
+				timer = 11;
 			}
 			RedLEDChannel.setValue(RedLEDPort, value != 1);
 			buzzerChannel.setValue(buzzerPort, value != 1);
@@ -75,8 +64,26 @@ public class SecretAgentBehavior implements DigitalListener, ShutdownListener, S
 	}
 
 	@Override
+	public void timeEvent(long time, int iteration) {
+		if (gameOn) {
+			timer--;
+			if (timer > 9) {
+				Grove_LCD_RGB.commandForTextAndColor(LCDChannel, "Game started!", 227, 227, 227);
+			} else if (timer > 5 && timer <= 9) {
+				Grove_LCD_RGB.commandForTextAndColor(LCDChannel, "Hurry!\nTime: " + timer, 0, 191, 255);
+			} else if (timer > -1 && timer <= 5) {
+				Grove_LCD_RGB.commandForTextAndColor(LCDChannel, "Time running\nout! Time: " + timer, 255, 255, 51);
+			} else if (timer <= -1) {
+				gameOn = false;
+				Grove_LCD_RGB.commandForTextAndColor(LCDChannel, "Too slow!\nGame over", 255, 0, 0);
+				buzzerChannel.setValueAndBlock(buzzerPort, 1, 1000);
+			}
+		}
+	}
+
+	@Override
 	public void startup() {
-		Grove_LCD_RGB.commandForTextAndColor(LCDChannel, "Secret Agent\nGame", 255, 215, 0);
+		Grove_LCD_RGB.commandForTextAndColor(LCDChannel, "Secret Agent!\nPush to start", 0, 255, 255);
 	}
 
 	public boolean acceptShutdown() {

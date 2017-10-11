@@ -23,7 +23,7 @@ public class IoTApp implements FogApp
         hardware.connect(LED, RED_LED_PORT);
         hardware.connect(Button, BUTTON_PORT);
         hardware.connect(MotionSensor, MOTION_PORT);
-        
+        hardware.setTimerPulseRate(1000);
     }
 
     @Override
